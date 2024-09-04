@@ -22,7 +22,7 @@ const Navbar = () => {
               </a>
               <a
                 className="inline-block rounded-lg px-3 py-2 text-lg font-medium text-blue-500 transition-all duration-300 hover:bg-white/20 hover:text-gray-100"
-                href="/blogs"
+                href="/blog"
               >
                 Blog
               </a>

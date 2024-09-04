@@ -3,8 +3,9 @@ from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
-import random
 from datetime import timedelta
+from datetime import datetime
+import random
 
 from models import db, User, Education, Experience, Projects, Blogs
 
@@ -12,15 +13,14 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = "WERTYUIODFGHJK" + str(random.randint(1, 1000000))
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///portfolio.db"
 app.config["JWT_SECRET_KEY"] = "WERTYUIODFGHJK" + str(random.randint(1, 1000000))
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=2) 
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=2)
 app.config['DEBUG'] = True
 
 db.init_app(app)
 migrate = Migrate(app, db)
 jwt = JWTManager(app)
 bcrypt = Bcrypt(app)
-CORS(app)
-
+CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}})
 
 @app.route("/")
 def index():
@@ -44,8 +44,6 @@ def register():
 
     return jsonify({"message": "User registered successfully"}), 201
 
-
-
 @app.route('/login', methods=['POST'])
 def login():
     email = request.json.get('email')
@@ -61,9 +59,6 @@ def login():
     else:
         return jsonify({"error": "Invalid email or password"}), 401
 
-
-
-# current user
 @app.route("/current_user", methods=["GET"])
 @jwt_required()
 def current_user():
@@ -84,9 +79,17 @@ def protected():
 def add_education():
     school = request.json.get("school")
     location = request.json.get("location")
-    start_date = request.json.get("start_date")
-    end_date = request.json.get("end_date")
+    start_date_str = request.json.get("start_date")
+    end_date_str = request.json.get("end_date")
     tags = request.json.get("tags")
+    
+    date_format = "%d/%m/%Y"
+
+    try:
+        start_date = datetime.strptime(start_date_str, date_format).date()
+        end_date = datetime.strptime(end_date_str, date_format).date()
+    except ValueError as e:
+        return jsonify({"error": f"Date format error: {e}"}), 400
 
     education = Education(school=school, location=location, start_date=start_date, end_date=end_date, tags=tags)
     db.session.add(education)
@@ -106,9 +109,25 @@ def update_education(id):
 
     school = request.json.get("school")
     location = request.json.get("location")
-    start_date = request.json.get("start_date")
-    end_date = request.json.get("end_date")
+    start_date_str = request.json.get("start_date")
+    end_date_str = request.json.get("end_date")
     tags = request.json.get("tags")
+
+    if start_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, "%d/%m/%Y").date()
+        except ValueError:
+            return jsonify({"error": "Invalid start date format"}), 400
+    else:
+        start_date = education.start_date
+
+    if end_date_str:
+        try:
+            end_date = datetime.strptime(end_date_str, "%d/%m/%Y").date()
+        except ValueError:
+            return jsonify({"error": "Invalid end date format"}), 400
+    else:
+        end_date = education.end_date
 
     education.school = school
     education.location = location
@@ -129,16 +148,23 @@ def delete_education(id):
 
     return jsonify({"message": "Education deleted successfully"})
 
-@app.route("/add_experience", methods=["POST"])  # Added leading slash
+@app.route("/add_experience", methods=["POST"])
 @jwt_required()
 def add_experience():
     company = request.json.get("company")
     location = request.json.get("location")
-    start_date = request.json.get("start_date")
-    end_date = request.json.get("end_date")
+    start_date_str = request.json.get("start_date")
+    end_date_str = request.json.get("end_date")
     title = request.json.get("title")
     responsibilities = request.json.get("responsibilities")
     skills = request.json.get("skills")
+
+    date_format = "%d/%m/%Y"
+    try:
+        start_date = datetime.strptime(start_date_str, date_format).date()
+        end_date = datetime.strptime(end_date_str, date_format).date()
+    except ValueError as e:
+        return jsonify({"error": f"Date format error: {e}"}), 400
 
     experience = Experience(company=company, location=location, start_date=start_date, end_date=end_date, title=title, responsibilities=responsibilities, skills=skills)
     db.session.add(experience)
@@ -158,11 +184,27 @@ def update_experience(id):
 
     company = request.json.get("company")
     location = request.json.get("location")
-    start_date = request.json.get("start_date")
-    end_date = request.json.get("end_date")
+    start_date_str = request.json.get("start_date")
+    end_date_str = request.json.get("end_date")
     title = request.json.get("title")
     responsibilities = request.json.get("responsibilities")
     skills = request.json.get("skills")
+
+    if start_date_str:
+        try:
+            start_date = datetime.strptime(start_date_str, "%d/%m/%Y").date()
+        except ValueError:
+            return jsonify({"error": "Invalid start date format"}), 400
+    else:
+        start_date = experience.start_date
+
+    if end_date_str:
+        try:
+            end_date = datetime.strptime(end_date_str, "%d/%m/%Y").date()
+        except ValueError:
+            return jsonify({"error": "Invalid end date format"}), 400
+    else:
+        end_date = experience.end_date
 
     experience.company = company
     experience.location = location
@@ -235,13 +277,19 @@ def delete_project(id):
 
     return jsonify({'message': 'Project deleted successfully'})
 
-@app.route('/add_blogpost', methods=['POST'])  # Added leading slash
+@app.route('/add_blogpost', methods=['POST'])
 @jwt_required()
 def add_blogpost():
     title = request.json.get('title')
     content = request.json.get('content')
     image = request.json.get('image')
-    date_published = request.json.get('date_published')
+    date_published_str = request.json.get('date_published')
+
+    date_format = "%d/%m/%Y"
+    try:
+        date_published = datetime.strptime(date_published_str, date_format).date()
+    except ValueError as e:
+        return jsonify({"error": f"Date format error: {e}"}), 400
 
     blogpost = Blogs(title=title, content=content, image=image, date_published=date_published)
     db.session.add(blogpost)
@@ -262,7 +310,15 @@ def update_blogpost(id):
     title = request.json.get('title')
     content = request.json.get('content')
     image = request.json.get('image')
-    date_published = request.json.get('date_published')
+    date_published_str = request.json.get('date_published')
+
+    if date_published_str:
+        try:
+            date_published = datetime.strptime(date_published_str, "%d/%m/%Y").date()
+        except ValueError:
+            return jsonify({"error": "Invalid date published format"}), 400
+    else:
+        date_published = blogpost.date_published
 
     blogpost.title = title
     blogpost.content = content
